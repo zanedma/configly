@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/zanedma/configly/pkg/log"
@@ -15,20 +16,17 @@ const (
 	defaultTagKey = "configly"
 )
 
-var (
-	errNoSource    = errors.New("at least one source is required")
-	ErrInvalidType = errors.New("generic type passed to Load must be a struct")
-	loadLogger     = log.GetBase().With().Str("component", "load").Logger()
-)
-
 type tagOptions struct {
 	key          string
+	fieldIdx     int
 	required     bool
 	defaultValue string
 	min          *int64
 	max          *int64
 	minLen       *int
 	maxLen       *int
+	sourceName   string
+	rawVal       string
 	// TODO pattern
 }
 
@@ -36,7 +34,6 @@ type Loader[T any] struct {
 	tagKey  string
 	sources []Source
 	val     reflect.Value
-	valType reflect.Type
 	logger  zerolog.Logger
 }
 
@@ -47,15 +44,16 @@ type LoaderConfig struct {
 
 func New[T any](cfg LoaderConfig) (*Loader[T], error) {
 	if len(cfg.Sources) == 0 {
-		return nil, errNoSource
+		return nil, errors.New("at least one source is required")
 	}
 
 	var loaderCfgInstance T
 
 	val := reflect.ValueOf(&loaderCfgInstance).Elem()
 	valType := val.Type()
+	loadLogger := log.GetBase().With().Str("component", "load").Logger()
 	loadLogger.Debug().Msgf("validating type '%s'", valType.Name())
-	kind := reflect.TypeOf(val).Kind()
+	kind := valType.Kind()
 
 	if kind != reflect.Struct {
 		return nil, fmt.Errorf("invalid type for %s: %s (must be struct)", valType.Name(), kind)
@@ -70,51 +68,82 @@ func New[T any](cfg LoaderConfig) (*Loader[T], error) {
 	}
 
 	return &Loader[T]{
-		tagKey:  defaultTagKey,
+		tagKey:  tagKey,
 		sources: cfg.Sources,
 		val:     val,
-		valType: valType,
 		logger:  logger,
 	}, nil
 }
 
-func (l *Loader[T]) Load() (T, error) {
+func (l *Loader[T]) Load() (*T, error) {
 	var cfg T
-  _, err := l.parseAllTags()
-  if err != nil {
-    return cfg, err
-  }
-	// get values from sources
-  // validate values (could be done in above)
-	return cfg, nil
+	// parse all tags first, so that if there are any invalid/inproperly formatted
+	// tags, we can return all errors in one
+	tagOpts, err := l.parseAllTags()
+	if err != nil {
+		return nil, err
+	}
+
+	var validationErrors []error
+	fmt.Println(tagOpts, len(tagOpts), l.val.Type().NumField())
+	for _, opts := range tagOpts {
+		val, sourceName, found := l.getValueFromSources(opts.key)
+		if !found && opts.required {
+			validationErrors = append(validationErrors, fmt.Errorf("required value %s not found in provided sources", opts.key))
+			continue
+		}
+
+		if !found && opts.defaultValue != "" {
+			val = opts.defaultValue
+			found = true
+		}
+
+		if !found {
+			continue
+		}
+
+		value := l.val.Field(opts.fieldIdx)
+		if err := l.setField(&value, val); err != nil {
+			validationErrors = append(validationErrors, fmt.Errorf("error setting %s (source %s): %w", opts.key, sourceName, err))
+			continue
+		}
+	}
+
+	if len(validationErrors) > 0 {
+		return nil, errors.Join(validationErrors...)
+	}
+
+	return &cfg, nil
 }
 
 func (l *Loader[T]) parseAllTags() ([]tagOptions, error) {
 	var parseErrors []error
+	numFields := l.val.Type().NumField()
 	var allOpts []tagOptions
-	for idx := 0; idx < l.valType.NumField(); idx++ {
-		field := l.valType.Field(idx)
+	for idx := range numFields {
+		field := l.val.Type().Field(idx)
 		fieldValue := l.val.Field(idx)
 
 		if !fieldValue.CanSet() {
-			loadLogger.Debug().
+			l.logger.Debug().
 				Str("key", field.Name).
 				Msg("skipping unexported field")
 			continue
 		}
 
-		tag := field.Tag.Get("configly")
+		tag := field.Tag.Get(l.tagKey)
 		if tag == "" {
-			loadLogger.Debug().
+			l.logger.Debug().
 				Str("field", field.Name).
-				Msg("no configly tag found, skipping")
+				Msgf("no %s tag found, skipping", l.tagKey)
 			continue
 		}
 
-		tagOpts, tagWarnings := parseTag(tag)
+		tagOpts, tagWarnings := l.parseTag(tag)
 		if len(tagWarnings) > 0 {
 			parseErrors = append(parseErrors, tagWarnings...)
 		} else {
+			tagOpts.fieldIdx = idx
 			allOpts = append(allOpts, tagOpts)
 		}
 	}
@@ -122,11 +151,12 @@ func (l *Loader[T]) parseAllTags() ([]tagOptions, error) {
 	if len(parseErrors) > 0 {
 		return nil, errors.Join(parseErrors...)
 	}
+
 	return allOpts, nil
 }
 
-func parseTag(tag string) (tagOptions, []error) {
-	tagLogger := loadLogger.With().Str("func", "parseTag").Str("tag", tag).Logger()
+func (l *Loader[T]) parseTag(tag string) (tagOptions, []error) {
+	tagLogger := l.logger.With().Str("func", "parseTag").Str("tag", tag).Logger()
 	parts := strings.Split(tag, ",")
 	tagLogger.Debug().Strs("parts", parts).Send()
 	opts := tagOptions{
@@ -154,7 +184,7 @@ func parseTag(tag string) (tagOptions, []error) {
 				warnings = append(warnings, warning)
 				tagLogger.Warn().Err(warning).Send()
 			} else {
-				opts.min = &val
+				opts.max = &val
 			}
 		case strings.HasPrefix(part, "minLen="):
 			if val, err := parseLen("minLen", part); err != nil {
@@ -193,4 +223,87 @@ func parseLen(prefixKey, part string) (int, error) {
 		return 0, err
 	}
 	return val, nil
+}
+
+func (l *Loader[T]) getValuesFromSources(tagOpts map[string]*tagOptions) error {
+	var sourceErrors []error
+	for key := range tagOpts {
+		for _, source := range l.sources {
+			val, found, err := source.GetValue(key)
+			if err != nil {
+				sourceErrors = append(sourceErrors, fmt.Errorf("error getting value for key %s from source %s: %w", key, source.Name(), err))
+				continue
+			}
+			if found {
+				tagOpts[key].sourceName = source.Name()
+				tagOpts[key].rawVal = val
+				break
+			}
+		}
+	}
+	if len(sourceErrors) > 0 {
+		return errors.Join(sourceErrors...)
+	}
+	return nil
+}
+
+func (l *Loader[T]) getValueFromSources(key string) (string, string, bool) {
+	logger := l.logger.With().Str("func", "getValueFromSources").Str("key", key).Logger()
+	for _, source := range l.sources {
+		val, found, err := source.GetValue(key)
+		if err != nil {
+			logger.Warn().Str("source", source.Name()).Err(err)
+			continue
+		}
+		if found {
+			logger.Debug().Str("source", source.Name()).Msgf("found value %s", val)
+			return val, source.Name(), true
+		}
+	}
+	return "", "", false
+}
+
+func (l *Loader[T]) setField(value *reflect.Value, strVal string) error {
+	switch value.Kind() {
+	case reflect.String:
+		value.SetString(strVal)
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		if value.Type() == reflect.TypeOf(time.Duration(0)) {
+			duration, err := time.ParseDuration(strVal)
+			if err != nil {
+				return fmt.Errorf("invalid duration: %w", err)
+			}
+			value.SetInt(int64(duration))
+			return nil
+		}
+		intVal, err := strconv.ParseInt(strVal, 10, 64)
+		if err != nil {
+			return fmt.Errorf("invalid integer: %w", err)
+		}
+		value.SetInt(intVal)
+
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		uintVal, err := strconv.ParseUint(strVal, 10, 64)
+		if err != nil {
+			return fmt.Errorf("invalid unsigned integer: %w", err)
+		}
+		value.SetUint(uintVal)
+
+	case reflect.Float32, reflect.Float64:
+		floatVal, err := strconv.ParseFloat(strVal, 64)
+		if err != nil {
+			return fmt.Errorf("invalid float: %w", err)
+		}
+		value.SetFloat(floatVal)
+
+	case reflect.Bool:
+		boolVal, err := strconv.ParseBool(strVal)
+		if err != nil {
+			return fmt.Errorf("invalid boolean: %w", err)
+		}
+		value.SetBool(boolVal)
+	default:
+		return fmt.Errorf("unsupported field type: %s", value.Kind())
+	}
+	return nil
 }
