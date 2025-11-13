@@ -33,8 +33,7 @@ type tagOptions struct {
 type Loader[T any] struct {
 	tagKey  string
 	sources []Source
-	// val     reflect.Value
-	logger zerolog.Logger
+	logger  zerolog.Logger
 }
 
 type LoaderConfig struct {
@@ -70,8 +69,7 @@ func New[T any](cfg LoaderConfig) (*Loader[T], error) {
 	return &Loader[T]{
 		tagKey:  tagKey,
 		sources: cfg.Sources,
-		// val:     val,
-		logger: logger,
+		logger:  logger,
 	}, nil
 }
 
@@ -80,7 +78,10 @@ func (l *Loader[T]) Load() (*T, error) {
 	val := reflect.ValueOf(&cfg).Elem()
 	typ := val.Type()
 	// parse all tags first, so that if there are any invalid/inproperly formatted
-	// tags, we can return all errors in one
+	// tags, we can return all errors in one before attempting to fetch values from
+	// the sources which adds unnecessary runtime (trade-off is that the generic T
+	// must have valid tags before the user knows if there are any issues with the
+	// actual values stored in the sources)
 	tagOpts, err := l.parseAllTags(typ.NumField(), val)
 	if err != nil {
 		return nil, err
