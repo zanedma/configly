@@ -25,8 +25,6 @@ type tagOptions struct {
 	max          *int64
 	minLen       *int
 	maxLen       *int
-	sourceName   string
-	rawVal       string
 	// TODO pattern
 }
 
@@ -224,28 +222,6 @@ func parseLen(prefixKey, part string) (int, error) {
 		return 0, err
 	}
 	return val, nil
-}
-
-func (l *Loader[T]) getValuesFromSources(tagOpts map[string]*tagOptions) error {
-	var sourceErrors []error
-	for key := range tagOpts {
-		for _, source := range l.sources {
-			val, found, err := source.GetValue(key)
-			if err != nil {
-				sourceErrors = append(sourceErrors, fmt.Errorf("error getting value for key %s from source %s: %w", key, source.Name(), err))
-				continue
-			}
-			if found {
-				tagOpts[key].sourceName = source.Name()
-				tagOpts[key].rawVal = val
-				break
-			}
-		}
-	}
-	if len(sourceErrors) > 0 {
-		return errors.Join(sourceErrors...)
-	}
-	return nil
 }
 
 func (l *Loader[T]) getValueFromSources(key string) (string, string, bool) {
