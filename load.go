@@ -33,8 +33,8 @@ type tagOptions struct {
 type Loader[T any] struct {
 	tagKey  string
 	sources []Source
-	val     reflect.Value
-	logger  zerolog.Logger
+	// val     reflect.Value
+	logger zerolog.Logger
 }
 
 type LoaderConfig struct {
@@ -70,31 +70,32 @@ func New[T any](cfg LoaderConfig) (*Loader[T], error) {
 	return &Loader[T]{
 		tagKey:  tagKey,
 		sources: cfg.Sources,
-		val:     val,
-		logger:  logger,
+		// val:     val,
+		logger: logger,
 	}, nil
 }
 
 func (l *Loader[T]) Load() (*T, error) {
 	var cfg T
+	val := reflect.ValueOf(&cfg).Elem()
+	typ := val.Type()
 	// parse all tags first, so that if there are any invalid/inproperly formatted
 	// tags, we can return all errors in one
-	tagOpts, err := l.parseAllTags()
+	tagOpts, err := l.parseAllTags(typ.NumField(), val)
 	if err != nil {
 		return nil, err
 	}
 
 	var validationErrors []error
-	fmt.Println(tagOpts, len(tagOpts), l.val.Type().NumField())
 	for _, opts := range tagOpts {
-		val, sourceName, found := l.getValueFromSources(opts.key)
+		value, sourceName, found := l.getValueFromSources(opts.key)
 		if !found && opts.required {
 			validationErrors = append(validationErrors, fmt.Errorf("required value %s not found in provided sources", opts.key))
 			continue
 		}
 
 		if !found && opts.defaultValue != "" {
-			val = opts.defaultValue
+			value = opts.defaultValue
 			found = true
 		}
 
@@ -102,8 +103,9 @@ func (l *Loader[T]) Load() (*T, error) {
 			continue
 		}
 
-		value := l.val.Field(opts.fieldIdx)
-		if err := l.setField(&value, val); err != nil {
+		// field := typ.Field(opts.fieldIdx)
+		fieldValue := val.Field(opts.fieldIdx)
+		if err := l.setField(&fieldValue, value); err != nil {
 			validationErrors = append(validationErrors, fmt.Errorf("error setting %s (source %s): %w", opts.key, sourceName, err))
 			continue
 		}
@@ -116,13 +118,12 @@ func (l *Loader[T]) Load() (*T, error) {
 	return &cfg, nil
 }
 
-func (l *Loader[T]) parseAllTags() ([]tagOptions, error) {
+func (l *Loader[T]) parseAllTags(numFields int, val reflect.Value) ([]tagOptions, error) {
 	var parseErrors []error
-	numFields := l.val.Type().NumField()
 	var allOpts []tagOptions
 	for idx := range numFields {
-		field := l.val.Type().Field(idx)
-		fieldValue := l.val.Field(idx)
+		field := val.Type().Field(idx)
+		fieldValue := val.Field(idx)
 
 		if !fieldValue.CanSet() {
 			l.logger.Debug().

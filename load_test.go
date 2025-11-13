@@ -2,6 +2,7 @@ package configly
 
 import (
 	"errors"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -575,8 +576,13 @@ func TestParseTag(t *testing.T) {
 func TestParseAllTags(t *testing.T) {
 	t.Run("parse all valid tags", func(t *testing.T) {
 		l, _ := New[configWithDefaults](LoaderConfig{Sources: []Source{&mockSource{name: "test"}}})
+		var cfg configWithDefaults
+		val := reflect.ValueOf(&cfg).Elem()
+		typ := val.Type()
 
-		tagMap, err := l.parseAllTags()
+		t.Log(typ.NumField(), val)
+		tagMap, err := l.parseAllTags(typ.NumField(), val)
+		t.Log(tagMap, err)
 		if err != nil {
 			t.Errorf("expected err to be nil, got: %s", err)
 		}
@@ -590,9 +596,12 @@ func TestParseAllTags(t *testing.T) {
 			Valid   string `configly:"valid"`
 			Invalid int    `configly:"invalid,min=abc"`
 		}
+		var cfg mixedConfig
+		val := reflect.ValueOf(&cfg).Elem()
+		typ := val.Type()
 		l, _ := New[mixedConfig](LoaderConfig{Sources: []Source{&mockSource{name: "test"}}})
 
-		_, err := l.parseAllTags()
+		_, err := l.parseAllTags(typ.NumField(), val)
 		if err == nil {
 			t.Error("expected error for invalid tag")
 		}
