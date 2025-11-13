@@ -103,7 +103,6 @@ func (l *Loader[T]) Load() (*T, error) {
 			continue
 		}
 
-		// field := typ.Field(opts.fieldIdx)
 		fieldValue := val.Field(opts.fieldIdx)
 		if err := l.setField(&fieldValue, value); err != nil {
 			validationErrors = append(validationErrors, fmt.Errorf("error setting %s (source %s): %w", opts.key, sourceName, err))
