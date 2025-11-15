@@ -18,11 +18,6 @@ type configWithDefaults struct {
 	Port int    `configly:"port,default=8080"`
 }
 
-type configWithValidation struct {
-	Age      int    `configly:"age,min=0,max=120"`
-	Username string `configly:"username,minLen=3,maxLen=20"`
-}
-
 type configWithAllTypes struct {
 	StringVal   string        `configly:"string_val"`
 	IntVal      int           `configly:"int_val"`

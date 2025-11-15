@@ -25,9 +25,9 @@ This checklist will help you prepare for the open-source launch.
    ```
    Go to: https://github.com/zanedma/configly/settings
    ```
-   - [ ] Enable "Discussions" (Settings → General → Features)
-   - [ ] Add topics/tags: `go`, `golang`, `configuration`, `config`, `env`, `dotenv`, `yaml`, `validation`, `type-safe`
-   - [ ] Add description: "Type-safe configuration loader for Go with validation"
+   - [x] Enable "Discussions" (Settings → General → Features)
+   - [x] Add topics/tags: `go`, `golang`, `configuration`, `config`, `env`, `dotenv`, `yaml`, `validation`, `type-safe`
+   - [x] Add description: "Type-safe configuration loader for Go with validation"
    - [ ] Add website: `https://pkg.go.dev/github.com/zanedma/configly`
 
 2. **Trigger pkg.go.dev Indexing**
