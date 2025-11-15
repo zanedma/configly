@@ -43,7 +43,7 @@ type Loader[T any] struct {
 
 // LoaderConfig contains configuration options for creating a new Loader.
 type LoaderConfig struct {
-	TagKey  string   // The struct tag key to use (defaults to "configly" if empty)
+	TagKey  string           // The struct tag key to use (defaults to "configly" if empty)
 	Sources []sources.Source // Configuration sources in priority order (first source wins)
 }
 

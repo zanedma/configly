@@ -90,7 +90,7 @@ func unmarshalFile(bytes []byte, fileType string, unmarshalFunc func(bytes []byt
 			result[key] = fmt.Sprintf("%d", v)
 		case uint, uint8, uint16, uint32, uint64:
 			result[key] = fmt.Sprintf("%d", v)
-		// Ignore: maps, slices, nil (objects, arrays, null)
+			// Ignore: maps, slices, nil (objects, arrays, null)
 		}
 	}
 
