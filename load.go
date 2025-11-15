@@ -107,6 +107,11 @@ func (l *Loader[T]) Load() (*T, error) {
 			validationErrors = append(validationErrors, fmt.Errorf("error setting %s (source %s): %w", opts.key, sourceName, err))
 			continue
 		}
+
+		err = l.validateField(fieldValue, opts)
+		if err != nil {
+			validationErrors = append(validationErrors, err)
+		}
 	}
 
 	if len(validationErrors) > 0 {
@@ -282,5 +287,44 @@ func (l *Loader[T]) setField(value *reflect.Value, strVal string) error {
 	default:
 		return fmt.Errorf("unsupported field type: %s", value.Kind())
 	}
+	return nil
+}
+
+func (l *Loader[T]) validateField(field reflect.Value, opts tagOptions) error {
+	switch field.Kind() {
+	case reflect.String:
+		str := field.String()
+		strLen := len(str)
+		if opts.minLen != nil && strLen < *opts.minLen {
+			return fmt.Errorf("string length %d less than minimum %d", strLen, *opts.minLen)
+		}
+
+		if opts.maxLen != nil && strLen > *opts.maxLen {
+			return fmt.Errorf("string length %d exceeds maximum %d", strLen, *opts.maxLen)
+		}
+
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Uint, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		val := field.Int()
+
+		if opts.min != nil && val < *opts.min {
+			return fmt.Errorf("integer value %d is less than minimum %d", val, *opts.min)
+		}
+
+		if opts.max != nil && val > *opts.max {
+			return fmt.Errorf("integer value %d exceeds maximum %d", val, *opts.max)
+		}
+
+	case reflect.Float32, reflect.Float64:
+		val := field.Float()
+
+		if opts.min != nil && val < float64(*opts.min) {
+			return fmt.Errorf("float value %f is less than minimum %d", val, *opts.min)
+		}
+
+		if opts.max != nil && val > float64(*opts.max) {
+			return fmt.Errorf("float value %f exceeds maximum %d", val, *opts.max)
+		}
+	}
+
 	return nil
 }

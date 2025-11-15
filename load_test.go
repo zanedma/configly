@@ -690,3 +690,341 @@ func containsHelper(s, substr string) bool {
 	}
 	return false
 }
+
+func TestValidateField(t *testing.T) {
+	l, _ := New[validConfig](LoaderConfig{Sources: []Source{&mockSource{name: "test"}}})
+
+	t.Run("validate string with minLen", func(t *testing.T) {
+		minLen := 5
+		opts := tagOptions{
+			key:    "test",
+			minLen: &minLen,
+		}
+
+		// Valid string
+		validStr := reflect.ValueOf("hello")
+		err := l.validateField(validStr, opts)
+		if err != nil {
+			t.Errorf("expected no error for valid string, got: %s", err)
+		}
+
+		// Invalid string (too short)
+		invalidStr := reflect.ValueOf("hi")
+		err = l.validateField(invalidStr, opts)
+		if err == nil {
+			t.Error("expected error for string shorter than minLen")
+		}
+	})
+
+	t.Run("validate string with maxLen", func(t *testing.T) {
+		maxLen := 10
+		opts := tagOptions{
+			key:    "test",
+			maxLen: &maxLen,
+		}
+
+		// Valid string
+		validStr := reflect.ValueOf("hello")
+		err := l.validateField(validStr, opts)
+		if err != nil {
+			t.Errorf("expected no error for valid string, got: %s", err)
+		}
+
+		// Invalid string (too long)
+		invalidStr := reflect.ValueOf("this is a very long string")
+		err = l.validateField(invalidStr, opts)
+		if err == nil {
+			t.Error("expected error for string longer than maxLen")
+		}
+	})
+
+	t.Run("validate string with minLen and maxLen", func(t *testing.T) {
+		minLen := 3
+		maxLen := 20
+		opts := tagOptions{
+			key:    "test",
+			minLen: &minLen,
+			maxLen: &maxLen,
+		}
+
+		// Valid string
+		validStr := reflect.ValueOf("username")
+		err := l.validateField(validStr, opts)
+		if err != nil {
+			t.Errorf("expected no error for valid string, got: %s", err)
+		}
+
+		// Too short
+		shortStr := reflect.ValueOf("ab")
+		err = l.validateField(shortStr, opts)
+		if err == nil {
+			t.Error("expected error for string shorter than minLen")
+		}
+
+		// Too long
+		longStr := reflect.ValueOf("this is way too long for the maximum length")
+		err = l.validateField(longStr, opts)
+		if err == nil {
+			t.Error("expected error for string longer than maxLen")
+		}
+	})
+
+	t.Run("validate int with min", func(t *testing.T) {
+		min := int64(0)
+		opts := tagOptions{
+			key: "test",
+			min: &min,
+		}
+
+		// Valid int
+		validInt := reflect.ValueOf(42)
+		err := l.validateField(validInt, opts)
+		if err != nil {
+			t.Errorf("expected no error for valid int, got: %s", err)
+		}
+
+		// Invalid int (below min)
+		invalidInt := reflect.ValueOf(-5)
+		err = l.validateField(invalidInt, opts)
+		if err == nil {
+			t.Error("expected error for int below minimum")
+		}
+	})
+
+	t.Run("validate int with max", func(t *testing.T) {
+		max := int64(100)
+		opts := tagOptions{
+			key: "test",
+			max: &max,
+		}
+
+		// Valid int
+		validInt := reflect.ValueOf(50)
+		err := l.validateField(validInt, opts)
+		if err != nil {
+			t.Errorf("expected no error for valid int, got: %s", err)
+		}
+
+		// Invalid int (above max)
+		invalidInt := reflect.ValueOf(150)
+		err = l.validateField(invalidInt, opts)
+		if err == nil {
+			t.Error("expected error for int above maximum")
+		}
+	})
+
+	t.Run("validate int with min and max", func(t *testing.T) {
+		min := int64(0)
+		max := int64(120)
+		opts := tagOptions{
+			key: "test",
+			min: &min,
+			max: &max,
+		}
+
+		// Valid int
+		validInt := reflect.ValueOf(25)
+		err := l.validateField(validInt, opts)
+		if err != nil {
+			t.Errorf("expected no error for valid int, got: %s", err)
+		}
+
+		// Below min
+		belowMin := reflect.ValueOf(-10)
+		err = l.validateField(belowMin, opts)
+		if err == nil {
+			t.Error("expected error for int below minimum")
+		}
+
+		// Above max
+		aboveMax := reflect.ValueOf(150)
+		err = l.validateField(aboveMax, opts)
+		if err == nil {
+			t.Error("expected error for int above maximum")
+		}
+	})
+
+	t.Run("validate int8 with min and max", func(t *testing.T) {
+		min := int64(0)
+		max := int64(100)
+		opts := tagOptions{
+			key: "test",
+			min: &min,
+			max: &max,
+		}
+
+		validInt8 := reflect.ValueOf(int8(50))
+		err := l.validateField(validInt8, opts)
+		if err != nil {
+			t.Errorf("expected no error for valid int8, got: %s", err)
+		}
+	})
+
+	t.Run("validate int16 with min and max", func(t *testing.T) {
+		min := int64(0)
+		max := int64(1000)
+		opts := tagOptions{
+			key: "test",
+			min: &min,
+			max: &max,
+		}
+
+		validInt16 := reflect.ValueOf(int16(500))
+		err := l.validateField(validInt16, opts)
+		if err != nil {
+			t.Errorf("expected no error for valid int16, got: %s", err)
+		}
+	})
+
+	t.Run("validate int32 with min and max", func(t *testing.T) {
+		min := int64(0)
+		max := int64(100000)
+		opts := tagOptions{
+			key: "test",
+			min: &min,
+			max: &max,
+		}
+
+		validInt32 := reflect.ValueOf(int32(50000))
+		err := l.validateField(validInt32, opts)
+		if err != nil {
+			t.Errorf("expected no error for valid int32, got: %s", err)
+		}
+	})
+
+	t.Run("validate int64 with min and max", func(t *testing.T) {
+		min := int64(0)
+		max := int64(1000000)
+		opts := tagOptions{
+			key: "test",
+			min: &min,
+			max: &max,
+		}
+
+		validInt64 := reflect.ValueOf(int64(500000))
+		err := l.validateField(validInt64, opts)
+		if err != nil {
+			t.Errorf("expected no error for valid int64, got: %s", err)
+		}
+	})
+
+	t.Run("validate uint with min and max", func(t *testing.T) {
+		min := int64(10)
+		max := int64(100)
+		opts := tagOptions{
+			key: "test",
+			min: &min,
+			max: &max,
+		}
+
+		validUint := reflect.ValueOf(uint(50))
+		err := l.validateField(validUint, opts)
+		if err != nil {
+			t.Errorf("expected no error for valid uint, got: %s", err)
+		}
+	})
+
+	t.Run("validate float32 with min", func(t *testing.T) {
+		min := int64(0)
+		opts := tagOptions{
+			key: "test",
+			min: &min,
+		}
+
+		// Valid float
+		validFloat := reflect.ValueOf(float32(3.14))
+		err := l.validateField(validFloat, opts)
+		if err != nil {
+			t.Errorf("expected no error for valid float32, got: %s", err)
+		}
+
+		// Invalid float (below min)
+		invalidFloat := reflect.ValueOf(float32(-1.5))
+		err = l.validateField(invalidFloat, opts)
+		if err == nil {
+			t.Error("expected error for float32 below minimum")
+		}
+	})
+
+	t.Run("validate float64 with max", func(t *testing.T) {
+		max := int64(100)
+		opts := tagOptions{
+			key: "test",
+			max: &max,
+		}
+
+		// Valid float
+		validFloat := reflect.ValueOf(float64(50.5))
+		err := l.validateField(validFloat, opts)
+		if err != nil {
+			t.Errorf("expected no error for valid float64, got: %s", err)
+		}
+
+		// Invalid float (above max)
+		invalidFloat := reflect.ValueOf(float64(150.5))
+		err = l.validateField(invalidFloat, opts)
+		if err == nil {
+			t.Error("expected error for float64 above maximum")
+		}
+	})
+
+	t.Run("validate float with min and max", func(t *testing.T) {
+		min := int64(0)
+		max := int64(100)
+		opts := tagOptions{
+			key: "test",
+			min: &min,
+			max: &max,
+		}
+
+		// Valid float
+		validFloat := reflect.ValueOf(float64(50.5))
+		err := l.validateField(validFloat, opts)
+		if err != nil {
+			t.Errorf("expected no error for valid float64, got: %s", err)
+		}
+
+		// Below min
+		belowMin := reflect.ValueOf(float64(-10.5))
+		err = l.validateField(belowMin, opts)
+		if err == nil {
+			t.Error("expected error for float64 below minimum")
+		}
+
+		// Above max
+		aboveMax := reflect.ValueOf(float64(150.5))
+		err = l.validateField(aboveMax, opts)
+		if err == nil {
+			t.Error("expected error for float64 above maximum")
+		}
+	})
+
+	t.Run("validate field with no constraints", func(t *testing.T) {
+		opts := tagOptions{
+			key: "test",
+		}
+
+		// Should pass for any value
+		err := l.validateField(reflect.ValueOf("any string"), opts)
+		if err != nil {
+			t.Errorf("expected no error for unconstrained field, got: %s", err)
+		}
+
+		err = l.validateField(reflect.ValueOf(12345), opts)
+		if err != nil {
+			t.Errorf("expected no error for unconstrained field, got: %s", err)
+		}
+	})
+
+	t.Run("validate bool field", func(t *testing.T) {
+		opts := tagOptions{
+			key: "test",
+		}
+
+		// Bool fields should not error (no validation for bool)
+		err := l.validateField(reflect.ValueOf(true), opts)
+		if err != nil {
+			t.Errorf("expected no error for bool field, got: %s", err)
+		}
+	})
+}
