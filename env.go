@@ -6,22 +6,22 @@ import (
 	"github.com/zanedma/configly/sources"
 )
 
-type EnvSource struct{}
+type envSource struct{}
 
 func FromEnv() sources.Source {
-	return &EnvSource{}
+	return &envSource{}
 }
 
-func (s *EnvSource) Name() string {
+func (s *envSource) Name() string {
 	return "env"
 }
 
-func (s *EnvSource) GetValue(key string) (string, bool, error) {
+func (s *envSource) GetValue(key string) (string, bool, error) {
 	val, found := os.LookupEnv(key)
 	return val, found, nil
 }
 
-func (s *EnvSource) GetPartialConfig(keys []string) (map[string]string, error) {
+func (s *envSource) GetPartialConfig(keys []string) (map[string]string, error) {
 	config := map[string]string{}
 	for _, key := range keys {
 		if value, ok := os.LookupEnv(key); ok {
