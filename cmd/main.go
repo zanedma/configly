@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/zanedma/configly"
+	"github.com/zanedma/configly/sources"
 )
 
 type Config struct {
@@ -19,7 +20,7 @@ type Config struct {
 
 func main() {
 	loaderConfig := configly.LoaderConfig{
-		Sources: []configly.Source{&configly.EnvSource{}},
+		Sources: []sources.Source{&configly.EnvSource{}},
 	}
 	loader, err := configly.New[Config](loaderConfig)
 	if err != nil {
