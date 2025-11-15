@@ -1,4 +1,4 @@
-package configly
+package sources
 
 type Source interface {
 	Name() string

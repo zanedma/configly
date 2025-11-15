@@ -1,14 +1,12 @@
-package configly
+package sources
 
 import (
 	"os"
-
-	"github.com/zanedma/configly/sources"
 )
 
 type EnvSource struct{}
 
-func FromEnv() sources.Source {
+func FromEnv() Source {
 	return &EnvSource{}
 }
 

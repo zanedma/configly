@@ -1,4 +1,4 @@
-package log
+package configly
 
 import (
 	"os"
@@ -13,7 +13,7 @@ var (
 )
 
 // TODO pass options
-func GetBase() zerolog.Logger {
+func getBaseLogger() zerolog.Logger {
 	once.Do(func() {
 		zerolog.SetGlobalLevel(zerolog.GlobalLevel())
 		base = zerolog.New(zerolog.ConsoleWriter{Out: os.Stdout, NoColor: false}).

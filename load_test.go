@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/zanedma/configly/sources"
 )
 
 type validConfig struct {
@@ -49,47 +51,10 @@ type configWithNoTags struct {
 	Field2 int
 }
 
-type configWithMixedTags struct {
-	Tagged   string `configly:"tagged"`
-	Untagged string
-}
-
-// Mock source for testing
-type mockSource struct {
-	name   string
-	values map[string]string
-	err    error
-}
-
-func (m *mockSource) Name() string {
-	return m.name
-}
-
-func (m *mockSource) GetValue(key string) (string, bool, error) {
-	if m.err != nil {
-		return "", false, m.err
-	}
-	val, found := m.values[key]
-	return val, found, nil
-}
-
-func (m *mockSource) GetPartialConfig(keys []string) (map[string]string, error) {
-	if m.err != nil {
-		return nil, m.err
-	}
-	result := make(map[string]string)
-	for _, key := range keys {
-		if val, found := m.values[key]; found {
-			result[key] = val
-		}
-	}
-	return result, nil
-}
-
 func TestNew(t *testing.T) {
 	t.Run("valid config", func(t *testing.T) {
 		l, err := New[validConfig](LoaderConfig{
-			Sources: []Source{&mockSource{name: "test"}},
+			Sources: []sources.Source{&sources.MockSource{SourceName: "test"}},
 		})
 		if err != nil {
 			t.Errorf("expected err to be nil, got: %s", err)
@@ -101,7 +66,7 @@ func TestNew(t *testing.T) {
 
 	t.Run("non-struct generic", func(t *testing.T) {
 		l, err := New[string](LoaderConfig{
-			Sources: []Source{&mockSource{name: "test"}},
+			Sources: []sources.Source{&sources.MockSource{SourceName: "test"}},
 		})
 		if err == nil {
 			t.Error("expected error to be non-nil")
@@ -127,7 +92,7 @@ func TestNew(t *testing.T) {
 		}
 		l, err := New[customTagConfig](LoaderConfig{
 			TagKey:  "env",
-			Sources: []Source{&mockSource{name: "test"}},
+			Sources: []sources.Source{&sources.MockSource{SourceName: "test"}},
 		})
 		if err != nil {
 			t.Errorf("expected err to be nil, got: %s", err)
@@ -143,7 +108,7 @@ func TestNew(t *testing.T) {
 
 	t.Run("default tag key", func(t *testing.T) {
 		l, err := New[validConfig](LoaderConfig{
-			Sources: []Source{&mockSource{name: "test"}},
+			Sources: []sources.Source{&sources.MockSource{SourceName: "test"}},
 		})
 		if err != nil {
 			t.Errorf("expected err to be nil, got: %s", err)
@@ -155,9 +120,9 @@ func TestNew(t *testing.T) {
 
 	t.Run("multiple sources", func(t *testing.T) {
 		l, err := New[validConfig](LoaderConfig{
-			Sources: []Source{
-				&mockSource{name: "source1"},
-				&mockSource{name: "source2"},
+			Sources: []sources.Source{
+				&sources.MockSource{SourceName: "source1"},
+				&sources.MockSource{SourceName: "source2"},
 			},
 		})
 		if err != nil {
@@ -171,11 +136,11 @@ func TestNew(t *testing.T) {
 
 func TestLoad(t *testing.T) {
 	t.Run("load with required field present", func(t *testing.T) {
-		source := &mockSource{
-			name:   "test",
-			values: map[string]string{"value": "test-value"},
+		source := &sources.MockSource{
+			SourceName: "test",
+			Values:     map[string]string{"value": "test-value"},
 		}
-		l, _ := New[validConfig](LoaderConfig{Sources: []Source{source}})
+		l, _ := New[validConfig](LoaderConfig{Sources: []sources.Source{source}})
 
 		cfg, err := l.Load()
 		if err != nil {
@@ -190,8 +155,8 @@ func TestLoad(t *testing.T) {
 	})
 
 	t.Run("load with required field missing", func(t *testing.T) {
-		source := &mockSource{name: "test", values: map[string]string{}}
-		l, _ := New[validConfig](LoaderConfig{Sources: []Source{source}})
+		source := &sources.MockSource{SourceName: "test", Values: map[string]string{}}
+		l, _ := New[validConfig](LoaderConfig{Sources: []sources.Source{source}})
 
 		cfg, err := l.Load()
 		if err == nil {
@@ -203,8 +168,8 @@ func TestLoad(t *testing.T) {
 	})
 
 	t.Run("load with default values", func(t *testing.T) {
-		source := &mockSource{name: "test", values: map[string]string{}}
-		l, _ := New[configWithDefaults](LoaderConfig{Sources: []Source{source}})
+		source := &sources.MockSource{SourceName: "test", Values: map[string]string{}}
+		l, _ := New[configWithDefaults](LoaderConfig{Sources: []sources.Source{source}})
 
 		cfg, err := l.Load()
 		if err != nil {
@@ -219,11 +184,11 @@ func TestLoad(t *testing.T) {
 	})
 
 	t.Run("load with source value overriding default", func(t *testing.T) {
-		source := &mockSource{
-			name:   "test",
-			values: map[string]string{"host": "example.com"},
+		source := &sources.MockSource{
+			SourceName: "test",
+			Values:     map[string]string{"host": "example.com"},
 		}
-		l, _ := New[configWithDefaults](LoaderConfig{Sources: []Source{source}})
+		l, _ := New[configWithDefaults](LoaderConfig{Sources: []sources.Source{source}})
 
 		cfg, err := l.Load()
 		if err != nil {
@@ -238,15 +203,15 @@ func TestLoad(t *testing.T) {
 	})
 
 	t.Run("load from multiple sources with priority", func(t *testing.T) {
-		source1 := &mockSource{
-			name:   "source1",
-			values: map[string]string{"value": "from-source1"},
+		source1 := &sources.MockSource{
+			SourceName: "source1",
+			Values:     map[string]string{"value": "from-source1"},
 		}
-		source2 := &mockSource{
-			name:   "source2",
-			values: map[string]string{"value": "from-source2"},
+		source2 := &sources.MockSource{
+			SourceName: "source2",
+			Values:     map[string]string{"value": "from-source2"},
 		}
-		l, _ := New[validConfig](LoaderConfig{Sources: []Source{source1, source2}})
+		l, _ := New[validConfig](LoaderConfig{Sources: []sources.Source{source1, source2}})
 
 		cfg, err := l.Load()
 		if err != nil {
@@ -258,15 +223,15 @@ func TestLoad(t *testing.T) {
 	})
 
 	t.Run("load skips source with error", func(t *testing.T) {
-		source1 := &mockSource{
-			name: "source1",
-			err:  errors.New("source error"),
+		source1 := &sources.MockSource{
+			SourceName: "source1",
+			Err:        errors.New("source error"),
 		}
-		source2 := &mockSource{
-			name:   "source2",
-			values: map[string]string{"value": "from-source2"},
+		source2 := &sources.MockSource{
+			SourceName: "source2",
+			Values:     map[string]string{"value": "from-source2"},
 		}
-		l, _ := New[validConfig](LoaderConfig{Sources: []Source{source1, source2}})
+		l, _ := New[validConfig](LoaderConfig{Sources: []sources.Source{source1, source2}})
 
 		cfg, err := l.Load()
 		if err != nil {
@@ -281,8 +246,8 @@ func TestLoad(t *testing.T) {
 		type badConfig struct {
 			Value int `configly:"value,min=abc"`
 		}
-		source := &mockSource{name: "test", values: map[string]string{}}
-		l, _ := New[badConfig](LoaderConfig{Sources: []Source{source}})
+		source := &sources.MockSource{SourceName: "test", Values: map[string]string{}}
+		l, _ := New[badConfig](LoaderConfig{Sources: []sources.Source{source}})
 
 		_, err := l.Load()
 		if err == nil {
@@ -291,11 +256,11 @@ func TestLoad(t *testing.T) {
 	})
 
 	t.Run("load with unexported field", func(t *testing.T) {
-		source := &mockSource{
-			name:   "test",
-			values: map[string]string{"public": "public-value", "private": "private-value"},
+		source := &sources.MockSource{
+			SourceName: "test",
+			Values:     map[string]string{"public": "public-value", "private": "private-value"},
 		}
-		l, _ := New[configWithUnexported](LoaderConfig{Sources: []Source{source}})
+		l, _ := New[configWithUnexported](LoaderConfig{Sources: []sources.Source{source}})
 
 		cfg, err := l.Load()
 		if err != nil {
@@ -311,8 +276,8 @@ func TestLoad(t *testing.T) {
 	})
 
 	t.Run("load with no tags", func(t *testing.T) {
-		source := &mockSource{name: "test", values: map[string]string{}}
-		l, _ := New[configWithNoTags](LoaderConfig{Sources: []Source{source}})
+		source := &sources.MockSource{SourceName: "test", Values: map[string]string{}}
+		l, _ := New[configWithNoTags](LoaderConfig{Sources: []sources.Source{source}})
 
 		cfg, err := l.Load()
 		if err != nil {
@@ -326,9 +291,9 @@ func TestLoad(t *testing.T) {
 
 func TestSetField(t *testing.T) {
 	t.Run("set all supported types", func(t *testing.T) {
-		source := &mockSource{
-			name: "test",
-			values: map[string]string{
+		source := &sources.MockSource{
+			SourceName: "test",
+			Values: map[string]string{
 				"string_val":   "hello",
 				"int_val":      "42",
 				"int8_val":     "8",
@@ -346,7 +311,7 @@ func TestSetField(t *testing.T) {
 				"duration_val": "5s",
 			},
 		}
-		l, _ := New[configWithAllTypes](LoaderConfig{Sources: []Source{source}})
+		l, _ := New[configWithAllTypes](LoaderConfig{Sources: []sources.Source{source}})
 
 		cfg, err := l.Load()
 		if err != nil {
@@ -392,11 +357,11 @@ func TestSetField(t *testing.T) {
 		type intConfig struct {
 			Value int `configly:"value"`
 		}
-		source := &mockSource{
-			name:   "test",
-			values: map[string]string{"value": "not-a-number"},
+		source := &sources.MockSource{
+			SourceName: "test",
+			Values:     map[string]string{"value": "not-a-number"},
 		}
-		l, _ := New[intConfig](LoaderConfig{Sources: []Source{source}})
+		l, _ := New[intConfig](LoaderConfig{Sources: []sources.Source{source}})
 
 		_, err := l.Load()
 		if err == nil {
@@ -408,11 +373,11 @@ func TestSetField(t *testing.T) {
 		type uintConfig struct {
 			Value uint `configly:"value"`
 		}
-		source := &mockSource{
-			name:   "test",
-			values: map[string]string{"value": "-1"},
+		source := &sources.MockSource{
+			SourceName: "test",
+			Values:     map[string]string{"value": "-1"},
 		}
-		l, _ := New[uintConfig](LoaderConfig{Sources: []Source{source}})
+		l, _ := New[uintConfig](LoaderConfig{Sources: []sources.Source{source}})
 
 		_, err := l.Load()
 		if err == nil {
@@ -424,11 +389,11 @@ func TestSetField(t *testing.T) {
 		type floatConfig struct {
 			Value float64 `configly:"value"`
 		}
-		source := &mockSource{
-			name:   "test",
-			values: map[string]string{"value": "not-a-float"},
+		source := &sources.MockSource{
+			SourceName: "test",
+			Values:     map[string]string{"value": "not-a-float"},
 		}
-		l, _ := New[floatConfig](LoaderConfig{Sources: []Source{source}})
+		l, _ := New[floatConfig](LoaderConfig{Sources: []sources.Source{source}})
 
 		_, err := l.Load()
 		if err == nil {
@@ -440,11 +405,11 @@ func TestSetField(t *testing.T) {
 		type boolConfig struct {
 			Value bool `configly:"value"`
 		}
-		source := &mockSource{
-			name:   "test",
-			values: map[string]string{"value": "not-a-bool"},
+		source := &sources.MockSource{
+			SourceName: "test",
+			Values:     map[string]string{"value": "not-a-bool"},
 		}
-		l, _ := New[boolConfig](LoaderConfig{Sources: []Source{source}})
+		l, _ := New[boolConfig](LoaderConfig{Sources: []sources.Source{source}})
 
 		_, err := l.Load()
 		if err == nil {
@@ -456,11 +421,11 @@ func TestSetField(t *testing.T) {
 		type durationConfig struct {
 			Value time.Duration `configly:"value"`
 		}
-		source := &mockSource{
-			name:   "test",
-			values: map[string]string{"value": "not-a-duration"},
+		source := &sources.MockSource{
+			SourceName: "test",
+			Values:     map[string]string{"value": "not-a-duration"},
 		}
-		l, _ := New[durationConfig](LoaderConfig{Sources: []Source{source}})
+		l, _ := New[durationConfig](LoaderConfig{Sources: []sources.Source{source}})
 
 		_, err := l.Load()
 		if err == nil {
@@ -470,7 +435,7 @@ func TestSetField(t *testing.T) {
 }
 
 func TestParseTag(t *testing.T) {
-	l, _ := New[validConfig](LoaderConfig{Sources: []Source{&mockSource{name: "test"}}})
+	l, _ := New[validConfig](LoaderConfig{Sources: []sources.Source{&sources.MockSource{SourceName: "test"}}})
 
 	t.Run("parse simple key", func(t *testing.T) {
 		opts, errs := l.parseTag("my_key")
@@ -575,7 +540,7 @@ func TestParseTag(t *testing.T) {
 
 func TestParseAllTags(t *testing.T) {
 	t.Run("parse all valid tags", func(t *testing.T) {
-		l, _ := New[configWithDefaults](LoaderConfig{Sources: []Source{&mockSource{name: "test"}}})
+		l, _ := New[configWithDefaults](LoaderConfig{Sources: []sources.Source{&sources.MockSource{SourceName: "test"}}})
 		var cfg configWithDefaults
 		val := reflect.ValueOf(&cfg).Elem()
 		typ := val.Type()
@@ -599,7 +564,7 @@ func TestParseAllTags(t *testing.T) {
 		var cfg mixedConfig
 		val := reflect.ValueOf(&cfg).Elem()
 		typ := val.Type()
-		l, _ := New[mixedConfig](LoaderConfig{Sources: []Source{&mockSource{name: "test"}}})
+		l, _ := New[mixedConfig](LoaderConfig{Sources: []sources.Source{&sources.MockSource{SourceName: "test"}}})
 
 		_, err := l.parseAllTags(typ.NumField(), val)
 		if err == nil {
@@ -610,15 +575,15 @@ func TestParseAllTags(t *testing.T) {
 
 func TestGetValueFromSources(t *testing.T) {
 	t.Run("get value from first source", func(t *testing.T) {
-		source1 := &mockSource{
-			name:   "source1",
-			values: map[string]string{"key": "value1"},
+		source1 := &sources.MockSource{
+			SourceName: "source1",
+			Values:     map[string]string{"key": "value1"},
 		}
-		source2 := &mockSource{
-			name:   "source2",
-			values: map[string]string{"key": "value2"},
+		source2 := &sources.MockSource{
+			SourceName: "source2",
+			Values:     map[string]string{"key": "value2"},
 		}
-		l, _ := New[validConfig](LoaderConfig{Sources: []Source{source1, source2}})
+		l, _ := New[validConfig](LoaderConfig{Sources: []sources.Source{source1, source2}})
 
 		val, sourceName, found := l.getValueFromSources("key")
 		if !found {
@@ -633,8 +598,8 @@ func TestGetValueFromSources(t *testing.T) {
 	})
 
 	t.Run("get value not found", func(t *testing.T) {
-		source := &mockSource{name: "test", values: map[string]string{}}
-		l, _ := New[validConfig](LoaderConfig{Sources: []Source{source}})
+		source := &sources.MockSource{SourceName: "test", Values: map[string]string{}}
+		l, _ := New[validConfig](LoaderConfig{Sources: []sources.Source{source}})
 
 		_, _, found := l.getValueFromSources("nonexistent")
 		if found {
@@ -643,11 +608,11 @@ func TestGetValueFromSources(t *testing.T) {
 	})
 
 	t.Run("get value with source error", func(t *testing.T) {
-		source := &mockSource{
-			name: "test",
-			err:  errors.New("source error"),
+		source := &sources.MockSource{
+			SourceName: "test",
+			Err:        errors.New("source error"),
 		}
-		l, _ := New[validConfig](LoaderConfig{Sources: []Source{source}})
+		l, _ := New[validConfig](LoaderConfig{Sources: []sources.Source{source}})
 
 		_, _, found := l.getValueFromSources("key")
 		if found {
@@ -663,8 +628,8 @@ func TestMultipleValidationErrors(t *testing.T) {
 			Field2 string `configly:"field2,required"`
 			Field3 string `configly:"field3,required"`
 		}
-		source := &mockSource{name: "test", values: map[string]string{}}
-		l, _ := New[multiRequiredConfig](LoaderConfig{Sources: []Source{source}})
+		source := &sources.MockSource{SourceName: "test", Values: map[string]string{}}
+		l, _ := New[multiRequiredConfig](LoaderConfig{Sources: []sources.Source{source}})
 
 		_, err := l.Load()
 		if err == nil {
@@ -692,7 +657,7 @@ func containsHelper(s, substr string) bool {
 }
 
 func TestValidateField(t *testing.T) {
-	l, _ := New[validConfig](LoaderConfig{Sources: []Source{&mockSource{name: "test"}}})
+	l, _ := New[validConfig](LoaderConfig{Sources: []sources.Source{&sources.MockSource{SourceName: "test"}}})
 
 	t.Run("validate string with minLen", func(t *testing.T) {
 		minLen := 5
