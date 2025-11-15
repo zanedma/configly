@@ -1,6 +1,6 @@
 # Contributing to Configly
 
-Thank you for your interest in contributing to Configly! We welcome contributions from the community.
+Thank you for your interest in contributing to Configly! Contributions from the community are welcome.
 
 ## Code of Conduct
 
@@ -220,6 +220,5 @@ func (s *ConsulSource) GetValue(key string) (string, bool, error) {
 Contributors will be recognized in:
 - The repository's contributor graph
 - Release notes when applicable
-- Our gratitude!
 
 Thank you for contributing to Configly!
