@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![GitHub release](https://img.shields.io/github/v/release/zanedma/configly)](https://github.com/zanedma/configly/releases)
 
-A type-safe, validation-focused configuration loader for Go with support for multiple configuration sources.
+A safe, validation-focused configuration loader for Go with support for multiple configuration sources.
 
 ## Features
 
