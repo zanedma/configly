@@ -1,7 +1,7 @@
 # Configly
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/zanedma/configly.svg)](https://pkg.go.dev/github.com/zanedma/configly)
-[![Go Report Card](https://goreportcard.com/badge/github.com/zanedma/configly)](https://goreportcard.com/report/github.com/zanedma/configly)
+[![Go Report Card](https://goreportcard.com/badge/github.com/zanedma/configly?style=flat-square)](https://goreportcard.com/report/github.com/zanedma/configly)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![GitHub release](https://img.shields.io/github/v/release/zanedma/configly)](https://github.com/zanedma/configly/releases)
 
